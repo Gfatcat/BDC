@@ -1,0 +1,190 @@
+#!/usr/bin/env python   
+“”"Convert Reuters 21578 SGML files to text files 
+ 
+This program converts Reuters SGML files from David D. Lewis into text  
+files usable for NLP analysis. Each document is created into its own  
+text file instead of keeping the files containing approximately 1000  
+documents. Newlines within the body of the text are collapsed to make  
+the sentence identification task more challenging.  
+ 
+Usage:  
+    reuters2txt.py filename  
+ 
+Example:  
+    reuters2txt.py reut2-000.sgm  
+ 
+Known Bugs:  
+    - Does not handle documents containing unprocessed text.  
+“”"  
+  
+###############################################################################   
+# Program information   
+###############################################################################   
+__author__ = ”Craig A. Struble”   
+__date__ = ”23 August 2005″   
+__version__ = ”$Revision: 1.1.1.1 $”   
+__credits__ = “”"David D. Lewis, the creator of the Reuters collection 
+Yuen-Hsien Tseng, wrote perl tools to do something similar  
+“”"  
+  
+###############################################################################   
+# Imports   
+###############################################################################   
+import sgmllib  
+  
+###############################################################################   
+# ReutersParser - an SGML parser   
+###############################################################################   
+class ReutersParser(sgmllib.SGMLParser):   
+    “”"A class to parse text from Reuters SGML files.”"”  
+  
+    def parse(self, s):   
+        “”"Parse the given string ’s', which is an SGML encoded file.”"”  
+  
+        self.feed(s)   
+        self.close()   
+  
+    def __init__(self, verbose=0):   
+        “”"Initialize an object, passing ’verbose’ to the superclass.”"”  
+  
+        sgmllib.SGMLParser.__init__(self, verbose)   
+        self.in_title = 0   
+        “”"Flag indicating whether or not we’re parsing the title.”"”  
+  
+        self.in_dateline = 0   
+        “”"Flag indicating whether or not we’re parsing the dateline”"”  
+  
+        self.in_body = 0   
+        “”"Flag indicating whether or not we’re parsing the body”"”  
+  
+        self.title = ”"   
+        “”"Title of the document”"”  
+  
+        self.doc_id = 0   
+        “”"Document ID”"”  
+  
+        self.dateline = ”"   
+        “”"Date line for the document”"”  
+  
+        self.body = ”"   
+        “”"Body of the document”"”  
+  
+    def handle_data(self, data):   
+        “”"Print out data in TEXT portions of the document.”"”  
+  
+        if self.in_body:   
+            self.body += data   
+        elif self.in_title:   
+            self.title += data   
+        elif self.in_dateline:   
+            self.dateline += data   
+  
+    ####   
+    # Handle the Reuters tag   
+    ####   
+    def start_reuters(self, attributes):   
+        “”"Process Reuters tags, which bracket a document. Create a new 
+        file for each document encountered.  
+        ”"”  
+  
+        for name, value in attributes:   
+            if name == ”newid”:   
+                self.doc_id = value   
+  
+    def end_reuters(self):   
+        “”"Write out the contents to a file and reset all variables.”"”  
+  
+        from textwrap import fill   
+        import re  
+  
+        # Print out the contents to a file. For the body of the   
+        # text, merge into 70 character lines using python’s fill   
+        # utility   
+        filename = ”text/” + str(self.doc_id) + ”.txt”   
+        doc_file = open(filename, ”w”)   
+        doc_file.write(self.title + ”\n”)   
+        doc_file.write(self.dateline + ”\n”)   
+        # Strip out multiple spaces in the body   
+        self.body = re.sub(r’\s+’, r’ ’, self.body)   
+        doc_file.write(fill(self.body) + ”\n”)   
+        doc_file.close()   
+  
+        # Reset variables   
+        self.in_title = 0   
+        self.in_dateline = 0   
+        self.in_body = 0   
+        self.doc_id = 0   
+        self.title = ”"   
+        self.body = ”"   
+        self.dateline = ”"   
+  
+    ####   
+    # Handle TITLE tags   
+    ####   
+    def start_title(self, attributes):   
+        “”"Indicate that the parser is in the title portion of the document. 
+        ”"”  
+  
+        self.in_title = 1   
+  
+    def end_title(self):   
+       “”"Indicate that the parser is no longer in the title portion of the 
+       document.  
+       ”"”  
+  
+       self.in_title = 0   
+  
+    ####   
+    # Handle DATELINE tags   
+    ####   
+    def start_dateline(self, attributes):   
+        “”"Indicate that the parser is in the dateline portion of the document. 
+        ”"”  
+  
+        self.in_dateline = 1   
+  
+    def end_dateline(self):   
+       “”"Indicate that the parser is no longer in the dateline portion of the 
+       document.  
+       ”"”  
+  
+       self.in_dateline = 0   
+  
+    ####   
+    # Handle BODY tags   
+    ####   
+    def start_body(self, attributes):   
+        “”"Indicate that the parser is in the body portion of the document. 
+        ”"”  
+  
+        self.in_body = 1   
+  
+    def end_body(self):   
+       “”"Indicate that the parser is no longer in the body portion of the 
+       document.  
+       ”"”  
+  
+       self.in_body = 0   
+  
+###############################################################################   
+# Main Program   
+###############################################################################   
+import sys  
+import os  
+import os.path   
+  
+if __name__ == ’__main__‘:   
+    # Get the filename as the first argument of the program,   
+    # open and read the file.   
+    # filename = sys.argv[1]   
+    filename = ”reut2-000.sgm”   
+    f = open(filename, ”r”)   
+    s = f.read()   
+  
+    # Create a text directory if one does not exist   
+    if not os.path.isdir(“text”):   
+        os.mkdir(“text”)   
+  
+    # Parse the file and output the results   
+    parser = ReutersParser()   
+    parser.parse(s)  
